@@ -64,12 +64,16 @@ async def process_link(message: types.Message, state: FSMContext):
     await bot.send_message(chat_id=ADMIN_ID, text="آیا می‌خواهید این پست را ارسال کنید؟", reply_markup=confirm_keyboard)
     await state.set_state(PostStates.confirmation)
 
-@dp.callback_query(StateFilter(PostStates.confirmation))
+@dp.callback_query(AdminFilter())
 async def process_confirmation(callback_query: types.CallbackQuery, state: FSMContext):
-    if callback_query.from_user.id != ADMIN_ID:
-        return
+    print("CALLBACK RECEIVED:", callback_query.data)
+    await callback_query.answer()
 
-    if callback_query.data not in ['confirm', 'cancel']:
+    current_state = await state.get_state()
+    print("CURRENT STATE:", current_state)
+
+    if current_state != PostStates.confirmation.state:
+        print("IGNORED: Not in confirmation state")
         return
 
     if callback_query.data == 'cancel':
@@ -78,13 +82,24 @@ async def process_confirmation(callback_query: types.CallbackQuery, state: FSMCo
         post_data.clear()
         return
 
-    # اگر تایید شد، ارسال به کانال
-    elif callback_query.data == 'confirm':
-        post_keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="دریافت فایل", url=post_data['link'])]])
+    if callback_query.data == 'confirm':
+        post_keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="دریافت فایل", url=post_data['link'])]]
+        )
+
         if 'photo' in post_data:
-            await bot.send_photo(chat_id=CHANNEL_ID, photo=post_data['photo'], caption=post_data['text'], reply_markup=post_keyboard)
+            await bot.send_photo(
+                chat_id=CHANNEL_ID,
+                photo=post_data['photo'],
+                caption=post_data['text'],
+                reply_markup=post_keyboard
+            )
         else:
-            await bot.send_message(chat_id=CHANNEL_ID, text=post_data['text'], reply_markup=post_keyboard)
+            await bot.send_message(
+                chat_id=CHANNEL_ID,
+                text=post_data['text'],
+                reply_markup=post_keyboard
+            )
 
         await callback_query.message.edit_text("پست در کانال ارسال شد.")
         await state.clear()
