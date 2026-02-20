@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy all files
 COPY . .
 
-# Install dependencies if you have any (مثلا requirements.txt)
-# RUN pip install -r requirements.txt
+# Install required Python packages
+RUN pip install --no-cache-dir aiogram==3.25.0
 
 # Command to run bot
 CMD ["python", "tg.py"]
