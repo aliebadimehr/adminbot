@@ -5,7 +5,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.filters import StateFilter, CommandStart
+from aiogram.filters import StateFilter, CommandStart, BaseFilter
 
 API_TOKEN = "8454313914:AAErG-SW2qWbqarlNouB5L6bsNwEHhdZUoM"
 ADMIN_ID = 7947733356
@@ -16,6 +16,10 @@ storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 print("Bot is ready")  # پیام آماده بودن بات در ترمینال
 
+class AdminFilter(BaseFilter):
+    async def __call__(self, message: types.Message) -> bool:
+        return message.from_user.id == ADMIN_ID
+
 class PostStates(StatesGroup):
     waiting_for_text = State()
     waiting_for_photo = State()
@@ -24,25 +28,19 @@ class PostStates(StatesGroup):
 
 post_data = {}
 
-@dp.message(CommandStart())
+@dp.message(CommandStart(), AdminFilter())
 async def cmd_start(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
     await message.answer("سلام! لطفا متن پست را ارسال کنید.")
     await state.set_state(PostStates.waiting_for_text)
 
-@dp.message(StateFilter(PostStates.waiting_for_text))
+@dp.message(StateFilter(PostStates.waiting_for_text), AdminFilter())
 async def process_text(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
     post_data['text'] = message.text
     await message.answer("متن دریافت شد. حالا عکس پست را ارسال کنید.")
     await state.set_state(PostStates.waiting_for_photo)
 
-@dp.message(StateFilter(PostStates.waiting_for_photo))
+@dp.message(StateFilter(PostStates.waiting_for_photo), AdminFilter())
 async def process_photo(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
     if not message.photo:
         await message.answer("لطفا فقط عکس ارسال کنید.")
         return
@@ -50,10 +48,8 @@ async def process_photo(message: types.Message, state: FSMContext):
     await message.answer("عکس دریافت شد. حالا لینک را ارسال کنید.")
     await state.set_state(PostStates.waiting_for_link)
 
-@dp.message(StateFilter(PostStates.waiting_for_link))
+@dp.message(StateFilter(PostStates.waiting_for_link), AdminFilter())
 async def process_link(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
     post_data['link'] = message.text.strip()
 
     # ارسال پیش‌نمایش با دکمه دریافت فایل
@@ -93,6 +89,10 @@ async def process_confirmation(callback_query: types.CallbackQuery, state: FSMCo
         await callback_query.message.edit_text("پست در کانال ارسال شد.")
         await state.clear()
         post_data.clear()
+
+@dp.message(AdminFilter(), StateFilter(None))
+async def debug_no_state(message: types.Message):
+    print(f"Debug: Received message from admin without state: {message.text}")
 
 async def main():
     await dp.start_polling(bot)
